@@ -1,0 +1,60 @@
+#cloud-config
+
+# apt update on first boot
+package_update: true
+
+# Configure DNS
+bootcmd:
+  - printf "[Resolve]\nDNS=8.8.8.8" > /etc/systemd/resolved.conf
+  - [systemctl, restart, systemd-resolved]
+
+# Install apt packages
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - gnupg2
+  - software-properties-common
+  - bridge-utils
+  - curl
+
+write_files:
+- path: /etc/modules-load.d/k8s.conf
+  permissions: '0644'
+  content: |
+    br_netfilter
+- path: /etc/sysctl.d/10-kubernetes.conf
+  permissions: '0644'
+  content: |
+    net.ipv4.ip_forward=1
+    net.bridge.bridge-nf-call-iptables=1
+    net.bridge.bridge-nf-call-arptables=1
+    net.ipv6.conf.all.disable_ipv6 = 1
+    net.ipv6.conf.default.disable_ipv6 = 1
+
+runcmd:
+  # Ensure br_netfilter module is loaded
+  - 'modprobe br_netfilter'
+  # Load /etc/sysctl.d/10-kubernetes.conf
+  - 'sysctl --system'
+  # Download Docker's signing key
+  - 'curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg'
+  # Add docker repo
+  - 'echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list'
+  # Download Google Cloud signing key
+  - 'curl -fsSLo /usr/share/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg'
+  # Add kubernetes apt repo
+  - 'echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" > /etc/apt/sources.list.d/kubernetes.list'
+  # Update package index
+  - 'apt-get update'
+  # Install packages
+  - 'apt-get install -y containerd.io kubelet=1.23.5-00 kubectl=1.23.5-00 kubeadm=1.23.5-00'
+  # Pin versions
+  - 'apt-mark hold kubelet kubectl kubeadm containerd.io'
+  # Configure containerd
+  - 'mkdir -p /etc/containerd'
+  - 'containerd config default > /etc/containerd/config.toml'
+  - 'systemctl restart containerd'
+  # Ensure prompt for root is colored
+  - 'cp /etc/skel/.bashrc /root/.bashrc'
+  # Switch to root on login
+  - 'echo "sudo -i" >> /home/ubuntu/.bashrc'
