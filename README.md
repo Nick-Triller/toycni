@@ -1,7 +1,7 @@
 # toycni
 
 A minimal CNI implemented for a meetup presentation.
-The slides are available at TBD.
+The slides [are available here](https://docs.google.com/presentation/d/17arLHXOlOKsXsuKKbDSE-cFqpJN5yhTkAFQQsgkqbtU/).
 
 ## Build
 
